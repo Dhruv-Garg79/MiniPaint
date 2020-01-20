@@ -3,6 +3,7 @@ package com.example.minipaint
 import android.content.Context
 import android.drm.DrmStore
 import android.graphics.*
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -10,10 +11,13 @@ import androidx.core.content.res.ResourcesCompat
 
 class MyCanvasView (context: Context) : View(context){
 
-    private lateinit var extraCanvas: Canvas
-    private lateinit var extraBitmap: Bitmap
     private lateinit var frame: Rect
-    private var path = Path()
+
+    // curPath representing the drawing so far
+    private val drawing = Path()
+
+    // curPath representing what's currently being drawn
+    private val curPath = Path()
 
     private val backgroundColor = ResourcesCompat.getColor(resources, R.color.colorBackground, null)
     private val drawColor = ResourcesCompat.getColor(resources, R.color.colorPaint, null)
@@ -37,8 +41,13 @@ class MyCanvasView (context: Context) : View(context){
 
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        canvas?.drawBitmap(extraBitmap, 0f, 0f, null)
-        canvas?.drawRect(frame, paint)
+        canvas?.let {
+            it.drawColor(backgroundColor)
+            it.drawPath(drawing, paint)
+            it.drawPath(curPath, paint)
+            it.drawRect(frame, paint)
+        }
+        Log.d(LOG, "onDraw")
     }
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
@@ -56,8 +65,8 @@ class MyCanvasView (context: Context) : View(context){
 
 
     private fun touchStart(){
-        path.reset()
-        path.moveTo(motionTouchEventX, motionTouchEventY)
+        curPath.reset()
+        curPath.moveTo(motionTouchEventX, motionTouchEventY)
 
         currentX = motionTouchEventX
         currentY = motionTouchEventY
@@ -70,36 +79,32 @@ class MyCanvasView (context: Context) : View(context){
         if (dx >= touchTolerance || dy >= touchTolerance){
             // QuadTo() adds a quadratic bezier from the last point,
             // approaching control point (x1,y1), and ending at (x2,y2).
-            path.quadTo(currentX, currentY, (motionTouchEventX + currentX) / 2, (motionTouchEventY + currentY) / 2)
+            curPath.quadTo(currentX, currentY, (motionTouchEventX + currentX) / 2, (motionTouchEventY + currentY) / 2)
 
             currentX = motionTouchEventX
             currentY = motionTouchEventY
-
-            extraCanvas.drawPath(path, paint)
         }
 
         invalidate()
     }
 
     private fun touchUp(){
-        // Reset the path so it doesn't get drawn again.
-        path.reset()
+        // Add the current path to the drawing so far
+        drawing.addPath(curPath)
+        // Reset the curPath so it doesn't get drawn again.
+        curPath.reset()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
 
-//        recycle extraBitmap before creating the next one.
-        if(::extraBitmap.isInitialized) extraBitmap.recycle()
-
-        extraBitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        extraCanvas = Canvas(extraBitmap)
-        extraCanvas.drawColor(backgroundColor)
         frame = Rect(inset, inset, width - inset, height - inset)
+        Log.d(LOG, "onSIzeChanged")
     }
 
     companion object {
         private const val STROKE_WIDTH = 10f
+        private const val LOG = "LOGGEDINFO"
     }
 
 }
